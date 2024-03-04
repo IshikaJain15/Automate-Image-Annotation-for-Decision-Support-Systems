@@ -15,6 +15,94 @@ import rasterio
 from rasterio.plot import show
 from PIL import Image
 from sklearn.model_selection import train_test_split
+import torchvision.transforms.functional as TF
+import cv2
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+def preprocess_image(image_path, desired_height=256, desired_width=256):
+    """
+    Preprocesses an image for transfer learning with a U-Net model.
+    
+    Args:
+    - image_path (str): Path to the input image file.
+    - desired_height (int): Desired height of the resized image.
+    - desired_width (int): Desired width of the resized image.
+    
+    Returns:
+    - tensor (torch.Tensor): Preprocessed image tensor ready for input to the U-Net model.
+    """
+    # Read the image
+    print(image_path)
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    
+    # Convert image to tensor
+    tensor = TF.to_tensor(image)
+    
+    # Resize the image
+    tensor = TF.resize(tensor, (desired_height, desired_width))
+    
+    # Add batch dimension
+    tensor = tensor.unsqueeze(0)
+    
+    return tensor
+
+import torchvision.transforms as transforms
+import cv2
+import torch
+
+class UNetTransform:
+    def __init__(self, desired_height=256, desired_width=256):
+        self.desired_height = desired_height
+        self.desired_width = desired_width
+
+    def __call__(self, image):
+        # Convert image to grayscale
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Convert image to tensor
+        tensor = transforms.functional.to_tensor(image)
+
+        # Resize the image
+        tensor = transforms.functional.resize(tensor, (self.desired_height, self.desired_width))
+
+        # Add batch dimension
+        tensor = tensor.unsqueeze(0)
+
+        return tensor
+
+
+class CustomDataset(Dataset):
+    def __init__(self, data_dict, transform=None):
+        self.data_dict = data_dict
+        self.transform = transform
+        self.images = list(data_dict.keys())
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        img_path = self.images[idx]
+        label_path = self.data_dict[img_path]
+        print(img_path)
+        print(label_path)
+        if not os.path.exists(img_path):
+            print(f"Image file does not exist: {img_path}")
+        if not os.path.exists(label_path):
+            print(f"Image file does not exist: {label_path}")
+        
+        
+        image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+
+      
+
+        if self.transform:
+            image = self.transform(image)
+            label = self.transform(label)
+
+        return image, label
+transform = UNetTransform(desired_height=256, desired_width=256)
 
 
 '''
