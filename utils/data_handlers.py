@@ -20,7 +20,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-def preprocess_image(image_path, desired_height=256, desired_width=256):
+def preprocess_image(image, desired_height=256, desired_width=256):
     """
     Preprocesses an image for transfer learning with a U-Net model.
     
@@ -32,15 +32,11 @@ def preprocess_image(image_path, desired_height=256, desired_width=256):
     Returns:
     - tensor (torch.Tensor): Preprocessed image tensor ready for input to the U-Net model.
     """
-    # Read the image
-    print(image_path)
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    
-    # Convert image to tensor
-    tensor = TF.to_tensor(image)
+   
+
     
     # Resize the image
-    tensor = TF.resize(tensor, (desired_height, desired_width))
+    tensor = TF.resize(image, (desired_height, desired_width))
     
     # Add batch dimension
     tensor = tensor.unsqueeze(0)
@@ -52,7 +48,7 @@ import cv2
 import torch
 
 class UNetTransform:
-    def __init__(self, desired_height=256, desired_width=256):
+    def __init__(self, desired_height=224, desired_width=224):
         self.desired_height = desired_height
         self.desired_width = desired_width
 
@@ -84,8 +80,7 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.images[idx]
         label_path = self.data_dict[img_path]
-        print(img_path)
-        print(label_path)
+   
         if not os.path.exists(img_path):
             print(f"Image file does not exist: {img_path}")
         if not os.path.exists(label_path):
@@ -94,16 +89,17 @@ class CustomDataset(Dataset):
         
         image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
-
-      
-
         if self.transform:
             image = self.transform(image)
             label = self.transform(label)
 
         return image, label
-transform = UNetTransform(desired_height=256, desired_width=256)
 
+transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                ])
 
 '''
 class CustomDataset(Dataset):
@@ -173,6 +169,7 @@ def link_label1_to_image(train_images_dir, train_labels_dir):
         labels[train_image_paths[idx]]=1
         artifacts[train_image_paths[idx]]=train_label_paths[idx]
     return labels, artifacts
+
 def link_label0_to_image(train_images_dir, save_label_dir):
     if not os.path.exists(save_label_dir):
         os.makedirs(save_label_dir)
