@@ -195,4 +195,73 @@ def link_label0_to_image(train_images_dir, save_label_dir):
         artifacts[train_image_paths[idx]]=train_label_paths[idx]
     return labels, artifacts
 
+def split_image_into_squares(image, label_image, num_rows=5, num_cols=5):
+    # Get the dimensions of each square
+    square_height = image.shape[0] // num_rows
+    square_width = image.shape[1] // num_cols
+    
+    # Initialize lists to store the cropped squares
+    cropped_images = []
+    cropped_label_images = []
+
+    for r in range(num_rows):
+        for c in range(num_cols):
+            # Define the coordinates for cropping
+            start_y = r * square_height
+            end_y = (r + 1) * square_height
+            start_x = c * square_width
+            end_x = (c + 1) * square_width
+            
+            # Crop the original image
+            cropped_image = image[start_y:end_y, start_x:end_x]
+            cropped_images.append(cropped_image)
+            
+            # Crop the label image
+            cropped_label = label_image[start_y:end_y, start_x:end_x]
+            cropped_label_images.append(cropped_label)
+
+    return cropped_images, cropped_label_images
+
+def view_cropped_images(cropped_images, cropped_label_images):
+    for i, cropped_image in enumerate(cropped_images):
+        cv2.imshow(f"Cropped Image {i}", cropped_image)
+
+    # Display the cropped label images
+    for i, cropped_label in enumerate(cropped_label_images):
+        cv2.imshow(f"Cropped Label {i}", cropped_label)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def create_folder_if_not_exists(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)    
+
+
+def save_cropped_images_and_labels(image_paths_and_labels, output_folder):
+    # Create output folders if they do not exist
+    create_folder_if_not_exists(output_folder)
+    create_folder_if_not_exists(os.path.join(output_folder, 'cropped_images'))
+    create_folder_if_not_exists(os.path.join(output_folder, 'cropped_labels'))
+
+    # Iterate over each image and label path in the dictionary
+    for image_path, label_path in image_paths_and_labels.items():
+        # Split the image into squares and get cropped images and labels
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+        cropped_images, cropped_labels = split_image_into_squares(image, label)
+
+        # Save cropped images and labels
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
+        for i, (cropped_image, cropped_label) in enumerate(zip(cropped_images, cropped_labels), 1):
+            cropped_image_path = os.path.join(output_folder, 'cropped_images', f'{image_name}_cropped_{i}.png')
+            cropped_label_path = os.path.join(output_folder, 'cropped_labels', f'{image_name}_cropped_{i}.png')
+            if not os.path.exists(cropped_image_path):
+                cv2.imwrite(cropped_image_path, cropped_image)
+            
+                # Check the threshold of the label image
+            if cv2.countNonZero(cropped_label) > 400:
+                cv2.imwrite(cropped_label_path.replace('.png', '_label1.png'), cropped_label)
+            else:
+                cv2.imwrite(cropped_label_path.replace('.png', '_label0.png'), cropped_label)
 
