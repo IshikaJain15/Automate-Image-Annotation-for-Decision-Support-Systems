@@ -38,8 +38,6 @@ def preprocess_image(image, desired_height=256, desired_width=256):
     # Resize the image
     tensor = TF.resize(image, (desired_height, desired_width))
     
-    # Add batch dimension
-    tensor = tensor.unsqueeze(0)
     
     return tensor
 
@@ -62,8 +60,6 @@ class UNetTransform:
         # Resize the image
         tensor = transforms.functional.resize(tensor, (self.desired_height, self.desired_width))
 
-        # Add batch dimension
-        tensor = tensor.unsqueeze(0)
 
         return tensor
 
@@ -71,7 +67,7 @@ class UNetTransform:
 class CustomDataset(Dataset):
     def __init__(self, data_dict, transform=None):
         self.data_dict = data_dict
-        self.transform = transform
+        self.transform = None
         self.images = list(data_dict.keys())
 
     def __len__(self):
@@ -89,17 +85,37 @@ class CustomDataset(Dataset):
         
         image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+        image=TF.to_tensor(image).float() 
+        label=TF.to_tensor(label).float() 
+        image=preprocess_image(image)
+        label=preprocess_image(label)
         if self.transform:
             image = self.transform(image)
             label = self.transform(label)
-
+        
         return image, label
 
-transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                ])
+
+import os
+
+def create_image_label_dict(image_folder, label_folder):
+    image_files = os.listdir(image_folder)
+    label_files = os.listdir(label_folder)
+    
+    # Sort the file lists to ensure correspondence between images and labels
+    
+    
+    image_label_dict = {}
+    
+    for image_file, label_file in zip(image_files, label_files):
+        image_path = os.path.join(image_folder, image_file)
+        label_path = os.path.join(label_folder, label_file)
+        
+        if os.path.isfile(image_path) and os.path.isfile(label_path):
+            image_label_dict[image_path] = label_path
+            
+    return image_label_dict
+
 
 '''
 class CustomDataset(Dataset):
@@ -195,7 +211,7 @@ def link_label0_to_image(train_images_dir, save_label_dir):
         artifacts[train_image_paths[idx]]=train_label_paths[idx]
     return labels, artifacts
 
-def split_image_into_squares(image, label_image, num_rows=5, num_cols=5):
+def split_image_into_squares(image, label_image, num_rows=3, num_cols=3):
     # Get the dimensions of each square
     square_height = image.shape[0] // num_rows
     square_width = image.shape[1] // num_cols
@@ -243,7 +259,8 @@ def save_cropped_images_and_labels(image_paths_and_labels, output_folder):
     create_folder_if_not_exists(output_folder)
     create_folder_if_not_exists(os.path.join(output_folder, 'cropped_images'))
     create_folder_if_not_exists(os.path.join(output_folder, 'cropped_labels'))
-
+    dict={}
+    
     # Iterate over each image and label path in the dictionary
     for image_path, label_path in image_paths_and_labels.items():
         # Split the image into squares and get cropped images and labels
@@ -258,10 +275,20 @@ def save_cropped_images_and_labels(image_paths_and_labels, output_folder):
             cropped_label_path = os.path.join(output_folder, 'cropped_labels', f'{image_name}_cropped_{i}.png')
             if not os.path.exists(cropped_image_path):
                 cv2.imwrite(cropped_image_path, cropped_image)
-            
-                # Check the threshold of the label image
-            if cv2.countNonZero(cropped_label) > 400:
-                cv2.imwrite(cropped_label_path.replace('.png', '_label1.png'), cropped_label)
-            else:
-                cv2.imwrite(cropped_label_path.replace('.png', '_label0.png'), cropped_label)
 
+                # Check the threshold of the label image
+                if cv2.countNonZero(cropped_label) > 200:
+                    cv2.imwrite(cropped_label_path.replace('.png', '_label1.png'), cropped_label)
+                    c_label_path=cropped_label_path.replace('.png', '_label1.png')
+                
+                else:
+                    cv2.imwrite(cropped_label_path.replace('.png', '_label0.png'), cropped_label)
+                    c_label_path=cropped_label_path.replace('.png', '_label0.png')
+                dict[cropped_image_path]=c_label_path
+            else:
+                if not os.path.exists(cropped_label_path.replace('.png', '_label0.png')):
+                    dict[cropped_image_path]=cropped_label_path.replace('.png', '_label1.png')
+                else:
+                    dict[cropped_image_path]=cropped_label_path.replace('.png', '_label0.png')
+      
+    return dict
